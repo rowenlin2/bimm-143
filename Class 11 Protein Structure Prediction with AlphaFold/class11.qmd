@@ -1,0 +1,101 @@
+---
+title: "Class 11 Protein Structure Prediction with AlphaFold"
+author: "Rowen Lin (PID: A18363990)"
+format: pdf
+editor: visual
+toc: true
+---
+
+```{r}
+library(bio3d)
+```
+
+```{r}
+unzip("hipvrdimer_94b5b.result.zip", exdir = "hivprdimer")
+
+results_dir <- "hivprdimer/hivprdimer_94b5b/"
+```
+
+
+Make a vector of input PDB file names that we can read into R
+
+```{r}
+pdb_files <- list.files(path = results_dir, pattern = "*.pdb", full.names = TRUE)
+pdb_files
+```
+
+## Custom Analysis of AlphaFold Models
+
+```{r}
+pdbs <- pdbaln(pdb_files, fit = TRUE, exefile = "msa")
+pdbs
+```
+
+Here we read in all 5 AlphaFold model PDB files and superposed them onto each other using the `pdbaln()` function from bio3d.
+
+```{r}
+rd <- rmsd(pdbs)
+print(rd, digits=2)
+```
+
+```{r}
+pdb <- read.pdb(pdb_files[1])
+
+plotb3(pdb$atom$b[pdb$calpha], typ="l", lwd=2, sse=pdb,
+       ylab="B-factor (pLDDT)")
+```
+The plot shows the pLDDT confidence scores per residue for the top 
+ranked model. Values above 70 are considered high confidence. The 
+HIV-Pr monomer shows consistently high pLDDT scores across the entire 
+chain, indicating a reliable prediction throughout.
+
+## Predicted Alignment Error for domains
+
+>> Next we examine the Predicted Aligned Error (PAE) matrix, which tells 
+us about the confidence in the relative positions of residue pairs 
+across the structure.
+
+```{r}
+library(jsonlite)
+
+pae_file <- list.files(results_dir, pattern="predicted_aligned_error_v1.json",
+                       full.names=TRUE)
+pae <- fromJSON(pae_file)
+
+plot.dmat(pae$predicted_aligned_error, xlab="Residue", ylab="Residue",
+          main="Predicted Aligned Error (PAE)")
+```
+The PAE matrix shows mostly blue across the entire residue matrix, which shows that AlphaFold is confident in the relative positions of all residue pairs. 
+
+## Residue conservation from alignment file
+
+```{r}
+aln_file <- list.files(results_dir, pattern=".a3m", full.names=TRUE)
+aln <- read.fasta(aln_file[1], to.upper=TRUE)
+dim(aln$ali)
+```
+The alignment has 5397 sequences across 132 positions.
+
+```{r}
+sim <- conserv(aln)
+
+plotb3(sim[1:99], sse=pdb, ylab="Conservation Score")
+```
+
+```{r}
+con <- consensus(aln, cutoff=0.9)
+con$seq
+
+pdb$atom$b[pdb$calpha] <- sim[1:99]
+write.pdb(pdb, file="m1_conserv.pdb")
+```
+
+## Section 10: Summary
+
+In this lab I used ColabFold to generate AlphaFold2 structure predictions for HIV protease. I analyzed the results using bio3d in R, and then I found pLDDT confidence scores, RMSD between models, predicted aligned error, and residue conservation. All 5 of these models showed high confidence and were very similar structures, with the catalytic Asp25 identified as the most conserved residue.
+
+
+
+
+
+

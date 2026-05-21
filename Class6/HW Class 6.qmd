@@ -1,0 +1,28 @@
+---
+title: "HW Class 6"
+author: "Rowen (PID: A18363990)"
+format: pdf
+---
+
+```{r}
+library(bio3d)
+```
+
+## Q6: How would you generalize the original code above to work with any set of input protein structures?
+
+This function takes a PDB ID, reads the protein, and plots the B-factor values from chain A alpha carbons. The plot shows which parts of the protein are more flexible and where drug binding could happen. The output of the function is a plot that shows B-factor values across the protein sequence.
+
+```{r}
+plot_protein_bfactor <- function(pdb_id) {
+  
+  pdb <- read.pdb(pdb_id)
+  chainA <- trim.pdb(pdb, chain = "A", elety = "CA")
+  plotb3(chainA$atom$b, sse = chainA, typ = "l", ylab = "B-factor")
+}
+
+```
+
+```{r}
+plot_protein_bfactor("4AKE")
+```
+

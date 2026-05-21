@@ -1,0 +1,27 @@
+---
+title: "Find a Gene"
+author: "Rowen (PID: A18363990)"
+format: html
+editor: visual
+---
+
+## **Q1** Tell me the name of a protein you are interested in. Include the species, accession number and known function. This can be a human protein or a protein from any other species as long as it's function is known.
+
+* Protein name: Retinol-binding protein 4 (RBP4)
+* Species: Homo sapiens
+* Accession number: NP_006735.1
+* Known function: Binds and transports retinol in the bloodstream
+
+## **Q2** Perform a BLAST search against a DNA database, such as a database consisting of genomic DNA or ESTs. The BLAST server can be at NCBI or elsewhere. Include details of the BLAST method used, database searched and any limits applied (e.g. Organism).
+
+* Program: TBLASTN
+* Database: EST
+* Organism limit: Amphibia
+* Selected hit: Ag2_p47_l4_M13R AG Ambystoma tigrinum tigrinum cDNA, mRNA sequence
+* Accession: CN064263.1
+* E-value: 2e - 93
+* Query coverage: 90%
+* Percent identity: 69.61%
+
+This result shows a homologous DNA sequence that encodes a protein similar to my query, as shown by the low E-value and high identity.
+
