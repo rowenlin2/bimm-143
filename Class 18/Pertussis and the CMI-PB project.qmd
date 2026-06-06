@@ -1,0 +1,222 @@
+---
+title: "Pertussis and the CMI-PB project"
+author: "Rowen Lin PID: A18363990"
+format: pdf
+editor: visual
+toc: true
+---
+
+# Background
+
+Pertussis (more commonly known as whooping cough) is a highly contagious respiratory disease caused by the bacterium Bordetella pertussis. People of all ages can be infected leading to violent coughing fits followed by a characteristic high-pitched “whoop” like intake of breath. Children have the highest risk for severe complications and death.
+
+# Investigating pertussis cases by year
+
+```{r}
+cdc <- read.csv("U.S. Reported Pertussis Cases_ 1922 - 2025.csv")
+
+cdc$Number.of.Reported.Pertussis.Cases <- as.numeric(gsub(",", "", cdc$Number.of.Reported.Pertussis.Cases))
+```
+
+>> Q1. With the help of the R “addin” package datapasta assign the CDC pertussis case number data to a data frame called cdc and use ggplot to make a plot of cases numbers over time.
+
+```{r}
+library(ggplot2)
+
+ggplot(cdc) +
+  aes(x = Year, y = Number.of.Reported.Pertussis.Cases) +
+  geom_point() +
+  geom_line() +
+  geom_vline(xintercept = 1946, color = "blue", linetype = "dashed") +
+  annotate("text", x = 1946, y = 250000, label = "wP vaccine", hjust = -0.1, color = "blue") +
+  geom_vline(xintercept = 1996, color = "red", linetype = "dashed") +
+  annotate("text", x = 1996, y = 250000, label = "aP vaccine", hjust = -0.1, color = "red") +
+  labs(title = "Pertussis Cases in the US (1922-2025)",
+       x = "Year", y = "Number of Reported Cases")
+```
+The plot shows a dramatic drop in pertussis cases following the introduction of the whole-cell wP vaccine in 1946, falling from over 200,000 cases per year to under 10,000 by the 1960s-70s. After the switch to the acellular aP vaccine in the 1990s, cases have slowly increased, suggesting the aP vaccine may provide weaker or shorter-lasting immunity.
+
+#A tale of two vaccines (wP & aP)
+
+>> Q2. Using the ggplot `geom_vline()` function add lines to your previous plot for the 1946 introduction of the wP vaccine and the 1996 switch to aP vaccine (see example in the hint below). What do you notice?
+
+After the introduction of the wP vaccine in 1946, cases dropped dramatically from over 200,000 to near zero. After the switch to the aP vaccine in 1996, cases have been slowly increasing again, suggesting the aP vaccine may offer weaker or shorter-lasting protection.
+
+>> Q3. Describe what happened after the introduction of the aP vaccine? Do you have a possible explanation for the observed trend?
+
+After the introduction of the aP vaccine, pertussis cases began to increase again, reaching 48,277 cases in 2012 — the highest since 1955. Several hypotheses exist for this resurgence: 1) more sensitive PCR-based testing detecting more cases, 2) vaccination hesitancy, 3) bacterial evolution allowing escape from vaccine immunity, and 4) waning immunity in adolescents who were primed as infants with the aP vaccine, which may induce shorter-lived protection compared to the older wP vaccine.
+
+# Exploring CMI-PB data
+
+>> Q4. How many aP and wP infancy vaccinated subjects are in the dataset?
+
+```{r}
+library(jsonlite)
+subject <- read_json("https://www.cmi-pb.org/api/subject", simplifyVector = TRUE)
+
+table(subject$infancy_vac)
+```
+There are 87 aP and 85 wP infancy vaccinated subjects in the dataset.
+
+>> Q5. How many Male and Female subjects/patients are in the dataset?
+
+```{r}
+table(subject$biological_sex)
+```
+There are 112 Female and 60 Male subjects in the dataset.
+
+
+>> Q6. What is the breakdown of race and biological sex (e.g. number of Asian females, White males etc…)?
+
+```{r}
+table(subject$biological_sex, subject$race)
+```
+The largest groups are White females (48), Asian females (32), and White males (32). The dataset is predominantly female and majority White/Asian, which may limit generalizability of findings to other populations.
+
+>> Q7. Using this approach determine (i) the average age of wP individuals, (ii) the average age of aP individuals; and (iii) are they significantly different?
+
+```{r}
+library(lubridate)
+library(dplyr)
+
+subject$age <- today() - ymd(subject$year_of_birth)
+
+wp <- subject[subject$infancy_vac == "wP",]
+ap <- subject[subject$infancy_vac == "aP",]
+
+mean(time_length(wp$age, "years"))
+mean(time_length(ap$age, "years"))
+```
+The average age of wP individuals is 37.1 years and the average age of aP individuals is 28.3 years. These groups are significantly different in age, which makes biological sense — wP was used before the mid-1990s switch to aP, so wP-vaccinated individuals would have been born earlier and are now older.
+
+>> Q8. Determine the age of all individuals at time of boost?
+
+```{r}
+int <- ymd(subject$date_of_boost) - ymd(subject$year_of_birth)
+age_at_boost <- time_length(int, "year")
+head(age_at_boost)
+```
+The age at time of boost for the first few subjects is shown in the output (the numeric values printed from `head(age_at_boost)`).
+
+>> Q9. With the help of a faceted boxplot or histogram (see below), do you think these two groups are significantly different?
+
+```{r}
+ggplot(subject) +
+  aes(time_length(age, "year"), fill = as.factor(infancy_vac)) +
+  geom_histogram(show.legend = FALSE) +
+  facet_wrap(vars(infancy_vac), nrow = 2) +
+  xlab("Age in years")
+```
+Yes, the two groups are significantly different. The aP group is clearly younger, clustered around 25–32 years, while the wP group is older, spread across 30–60 years. This age difference reflects the historical vaccine switch in the mid-1990s — people vaccinated with wP as infants are now older adults.
+
+>> Q10. Now using the same procedure join `meta` with `titer` data so we can further analyze this data in terms of time of visit aP/wP, male/female etc.
+
+```{r}
+titer <- read_json("https://www.cmi-pb.org/api/v4/plasma_ab_titer", simplifyVector = TRUE)
+
+specimen <- read_json("https://www.cmi-pb.org/api/v4/specimen", simplifyVector = TRUE)
+
+meta <- inner_join(specimen, subject)
+dim(meta)
+
+abdata <- inner_join(titer, meta)
+dim(abdata)
+```
+>> Q11. How many specimens (i.e. entries in `abdata`) do we have for each `isotype`?
+
+```{r}
+table(abdata$isotype)
+```
+
+>> Q12. What are the different `$dataset` values in `abdata` and what do you notice about the number of rows for the most “recent” dataset?
+
+```{r}
+table(abdata$dataset)
+```
+
+# Examine IgG Ab titer levels
+
+>> Q13. Complete the following code to make a summary boxplot of Ab titer levels (MFI) for all antigens:
+
+```{r}
+igg <- abdata %>% filter(isotype == "IgG")
+
+ggplot(igg) +
+  aes(MFI_normalised, antigen) +
+  geom_boxplot() +
+  xlim(0, 75) +
+  facet_wrap(vars(visit), nrow = 2)
+```
+The boxplot shows IgG MFI_normalised levels for each antigen across 8 visits. FIM2/3 shows the most dramatic increase at visits 5-7 (post-booster), while PT and FHA also show increases. Most antigens are low at baseline (visit 1).
+
+>> Q14. What antigens show differences in the level of IgG antibody titers recognizing them over time? Why these and not others?
+
+FIM2/3, PT, and FHA show the clearest differences over time. These are pertussis-specific antigens in the aP vaccine, so the immune system mounts a strong response after boosting. OVA shows no change because it's a control antigen not present in the vaccine.
+
+>> Q15. Filter to pull out only two specific antigens for analysis and create a boxplot for each. You can chose any you like. Below I picked a “control” antigen (“OVA”, that is not in our vaccines) and a clear antigen of interest (“PT”, Pertussis Toxin, one of the key virulence factors produced by the bacterium B. pertussis).
+
+```{r}
+filter(igg, antigen=="OVA") %>%
+  ggplot() +
+  aes(MFI_normalised, col=infancy_vac) +
+  geom_boxplot(show.legend = TRUE) +
+  facet_wrap(vars(visit)) +
+  theme_bw()
+
+filter(igg, antigen=="PT") %>%
+  ggplot() +
+  aes(MFI_normalised, col=infancy_vac) +
+  geom_boxplot(show.legend = TRUE) +
+  facet_wrap(vars(visit)) +
+  theme_bw()
+```
+Two antigens were chosen: OVA (control, not in vaccine) and PT (Pertussis Toxin, key vaccine antigen).
+
+>> Q16. What do you notice about these two antigens time courses and the PT data in particular?
+
+OVA shows no meaningful change across visits for either vaccine group, confirming it as a negative control. PT shows a clear increase starting at visit 4 (post-booster), indicating a strong antigen-specific immune response to boosting.
+
+>> Q17. Do you see any clear difference in aP vs. wP responses?
+
+For PT, wP individuals (teal) tend to have somewhat higher baseline IgG levels and a broader response compared to aP individuals (red), though both groups respond to the booster. This suggests wP-primed individuals may have a different baseline immune memory than aP-primed individuals.
+
+>> Q18. Does this trend look similar for the 2020 dataset?
+
+```{r}
+igg %>% filter(antigen == "PT", dataset == "2020_dataset") %>%
+  ggplot() +
+  aes(planned_day_relative_to_boost, MFI_normalised, 
+      col = infancy_vac, group = subject_id) +
+  geom_point() +
+  geom_line() +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_vline(xintercept = 14, linetype = "dashed") +
+  xlim(0, 125) +
+  labs(title = "2020 dataset IgG PT",
+       x = "planned_day_relative_to_boost")
+```
+Yes, the trend is similar — PT IgG levels peak around day 14 post-boost then decline. The 2020 dataset had some subjects followed longer (up to day 400+), but when viewed on the same scale the pattern matches the 2021 data. Both datasets show wP individuals tending to have higher peak responses than aP individuals.
+
+# Obtaining CMI-PB RNASeq data
+
+>> Q19. Make a plot of the time course of gene expression for IGHG1 gene (i.e. a plot of visit vs. tpm).
+
+```{r}
+url <- "https://www.cmi-pb.org/api/v2/rnaseq?versioned_ensembl_gene_id=eq.ENSG00000211896.7"
+rna <- read_json(url, simplifyVector = TRUE)
+ssrna <- inner_join(rna, meta)
+
+# Q19
+ggplot(ssrna) +
+  aes(visit, tpm, group = subject_id) +
+  geom_point() +
+  geom_line(alpha = 0.2)
+```
+
+>> Q20.: What do you notice about the expression of this gene (i.e. when is it at it’s maximum level)?
+
+IGHG1 gene expression is at its maximum at visit 4, which corresponds to approximately day 14 post-booster. Expression is very low at baseline (visits 1-3) and drops back down after visit 4.
+
+>> Q21. Does this pattern in time match the trend of antibody titer data? If not, why not?
+
+The pattern partially matches but not perfectly. Gene expression peaks sharply at visit 4 then drops, while antibody titers also peak around day 14 but decline more slowly and remain elevated longer. This makes biological sense — B cells rapidly produce antibody-encoding mRNA (captured by RNA-seq) shortly after boosting, but the antibody proteins themselves (measured by MFI) are long-lived and persist in circulation much longer than the gene expression signal.
